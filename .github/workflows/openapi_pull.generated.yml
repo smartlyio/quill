@@ -1,0 +1,107 @@
+# IMPORTANT NOTE/WARNING!
+# Do not make changes to this file, your changes will be overwritten.
+#
+# This file is automagically generated from:
+# - .github/templates/openapi_pull.yml.erb
+# - Templates contained in the smartlyio/github-actions-templates repository
+#
+# This file can be updated by editing the template file, and running `devbox render workflows`
+
+
+name: Pull OpenAPI Specifications
+
+on:
+  schedule:
+    - cron: '*/5 6-22 * * 1-5'
+
+jobs:
+  oas_pull:
+    runs-on: ubuntu-20.04
+    timeout-minutes: 5
+    env:
+      BRANCH_NAME: smartly/update-openapi-specs
+    steps:
+    - name: Get Repository Name
+      id: get_repository_name
+      run: |
+        REPO_NAME="$(echo "$GITHUB_REPOSITORY" | awk -F / '{print $2}' | sed -e "s/:refs//")"
+        echo REPOSITORY_NAME="$REPO_NAME" >> "$GITHUB_ENV"
+        echo ::set-output name=repository_name::"$REPO_NAME"
+    - uses: actions/checkout@v3
+      with:
+        persist-credentials: false
+        fetch-depth: 0
+    - uses: actions/checkout@v3
+      with:
+        repository: smartlyio/api-documentation
+        ssh-key: ${{ secrets.GIT_DEPLOY_KEY }}
+        path: tmp
+    - name: Login to docker registry dev.smartly.af
+      uses: docker/login-action@v2
+      with:
+        registry: dev.smartly.af
+        username: ${{ secrets.ARTIFACTORY_DOCKER_USERNAME }}
+        password: ${{ secrets.ARTIFACTORY_DOCKER_PASSWORD }}
+    - name: Login to docker hub registry
+      uses: docker/login-action@v2
+      with:
+        # No registry specification required for dockerhub, it's the default
+        username: ${{ secrets.DOCKERHUB_USERNAME }}
+        password: ${{ secrets.DOCKERHUB_TOKEN }}
+    - name: Use Publish to set up SSH key
+      uses: smartlyio/setup-git-action@v1
+      env:
+        GIT_DEPLOY_KEY: ${{ secrets.GIT_DEPLOY_KEY }}
+    - name: Checkout branch and move OpenAPI files
+      run: |
+        git checkout -b "$BRANCH_NAME"
+
+        mkdir -p openapi
+        xargs -I@ sh -c 'rm -f openapi/@/*.yml openapi/@/*.yaml' < .github/openapi-services.list
+        xargs -I@ sh -c 'cp -r tmp/services/@/. openapi/@' < .github/openapi-services.list
+        rm -rf tmp
+    - name: Commit changes and push changes
+      run: |
+        GIT_CHANGES="$(git status --porcelain -- openapi/ || true)"
+        if [[ -n "$GIT_CHANGES" ]]; then
+            echo "Changes to OpenAPI files found!"
+
+            git add openapi/
+            git commit -m "Updating OpenAPI specifications at $(date)"
+        else
+            echo "No Changes Found."
+        fi
+    - name: Open Pull Request
+      env:
+        GITHUB_TOKEN: ${{ secrets.GIT_PR_CREATE_TOKEN }}
+      run: |
+        echo "Check if there is an existing branch and if the change set already exists in it."
+        if [ -z "$(git diff "origin/$BRANCH_NAME" || echo "no branch")" ]; then
+          echo "Seems to have no differences from existing branch!"
+        else
+          echo "Pushing the branch"
+          git push --force-with-lease -u origin HEAD
+        fi
+
+        function pr_exists() {
+            local repo="$1"
+            local branch="$2"
+            local PR_COUNT=
+            PR_COUNT="$(gh api "repos/${repo}/pulls?state=open&head=smartlyio:${branch}" | jq '. | length')"
+            [ "$PR_COUNT" -gt 0 ]
+        }
+
+        HAS_CHANGES="$(git diff origin/develop)"
+        if [[ -n "$HAS_CHANGES" ]]; then
+          if pr_exists "$GITHUB_REPOSITORY" "$BRANCH_NAME"; then
+            echo "PR Exists already!"
+          else
+            echo "Create pull request"
+            gh pr create \
+              --title "Updating OpenAPI specifications" \
+              --head "$BRANCH_NAME" \
+              --body ""
+          fi
+        else
+          echo "No changes found relative to origin/develop"
+        fi

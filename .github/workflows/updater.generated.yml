@@ -1,0 +1,73 @@
+# IMPORTANT NOTE/WARNING!
+# Do not make changes to this file, your changes will be overwritten.
+#
+# This file is automagically generated from:
+# - .github/templates/updater.yml.erb
+# - Templates contained in the smartlyio/github-actions-templates repository
+#
+# This file can be updated by editing the template file, and running `devbox render workflows`
+
+name: Self Updater
+
+on:
+  push:
+    branches:
+      - develop
+    paths:
+      - '.github/workflows.yml'
+      - '.github/workflows/*.yml'
+      - '.github/templates/**'
+      - '.github/args.yml'
+  schedule:
+    - cron:  '1 6 * * 1-5'
+
+jobs:
+  update_gha:
+    name: Update Github Actions Workflows
+    runs-on: ubuntu-20.04
+    timeout-minutes: 5
+    steps:
+      - name: Get Repository Name
+        id: get_repository_name
+        run: |
+          REPO_NAME="$(echo "$GITHUB_REPOSITORY" | awk -F / '{print $2}' | sed -e "s/:refs//")"
+          echo REPOSITORY_NAME="$REPO_NAME" >> "$GITHUB_ENV"
+          echo ::set-output name=repository_name::"$REPO_NAME"
+      - name: Checkout
+        uses: actions/checkout@v3
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+      - name: Check out workflow templates
+        uses: actions/checkout@v3
+        with:
+          repository: ${{ secrets.SMARTLY_GHA_TEMPLATES }}
+          ssh-key: ${{ secrets.GIT_DEPLOY_KEY }}
+          path: REMOVE-ME-github-actions-templates
+          persist-credentials: false
+          fetch-depth: 0
+      - name: Use Publish to set up SSH key
+        uses: smartlyio/setup-git-action@v1
+        env:
+          GIT_DEPLOY_KEY: ${{ secrets.GIT_DEPLOY_KEY }}
+
+      - name: Login to docker registry dev.smartly.af
+        uses: docker/login-action@v2
+        with:
+          registry: dev.smartly.af
+          username: ${{ secrets.ARTIFACTORY_DOCKER_USERNAME }}
+          password: ${{ secrets.ARTIFACTORY_DOCKER_PASSWORD }}
+      - name: Login to docker hub registry
+        uses: docker/login-action@v2
+        with:
+          # No registry specification required for dockerhub, it's the default
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Run github actions templater
+        uses: smartlyio/github-actions-templater-action@master
+        with:
+          github-token: ${{ secrets.GIT_PR_CREATE_TOKEN }}
+          templates-location: "REMOVE-ME-github-actions-templates"
+          templater-image-name: dev.smartly.af/devbox:workflow-updater
+          extra-pr-label: "no release"

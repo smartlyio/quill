@@ -1,0 +1,12 @@
+name: PR build
+
+on:
+  pull_request:
+
+jobs:
+  build:
+    runs-on: [self-hosted, large]
+    steps:
+      @import smartlyio/steps/js/basic
+      - name: yarn build
+        run:  yarn run build

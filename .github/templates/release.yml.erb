@@ -1,0 +1,17 @@
+name: Publish packages
+
+on:
+  push:
+    branches: [master]
+
+jobs:
+  @import smartlyio/jobs/js/publish (publish_needs: [], remote_update: true)
+
+<%# Custom notification job that will only trigger a notification if
+  # the publish step failed -%>
+  notify-package-release:
+    if: ${{ always() }}
+    runs-on: [self-hosted, small]
+    needs: ["publish"]
+    steps:
+      @import smartlyio/steps/util/notify_custom (notify_text: "Quill package publish failed!", notify_conditional: "if: needs.publish.result == 'failure'")

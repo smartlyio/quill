@@ -1,0 +1,67 @@
+# IMPORTANT NOTE/WARNING!
+# Do not make changes to this file, your changes will be overwritten.
+#
+# This file is automagically generated from:
+# - .github/templates/toc_updater.yml.erb
+# - Templates contained in the smartlyio/github-actions-templates repository
+#
+# This file can be updated by editing the template file, and running `devbox render workflows`
+
+
+name: Table of Contents Updater
+
+on:
+  pull_request:
+    branches: [develop]
+  push:
+    branches: [develop]
+
+jobs:
+  generate_toc:
+    name: ToC Updater
+    runs-on: [self-hosted, small]
+    steps:
+      - name: Check the branch we need
+        id: get_active_branch
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          HEAD_REF: ${{ github.head_ref }}
+        run: |
+          # Moved logic here as it's easier to determine what's going on if we decide what to do in one place
+          BASE_BRANCH="$(gh api "repos/$GITHUB_REPOSITORY" | jq -r .default_branch)"
+          if [[ "$GITHUB_EVENT_NAME" == "push" ]]; then
+            echo ::set-output name=active_branch::"$BASE_BRANCH"
+          else
+            echo ::set-output name=active_branch::"$HEAD_REF"
+          fi
+      - uses: actions/checkout@v3
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+      - name: Install and run the doctoc
+        run: |
+          npx doctoc --notitle README.md
+      - name: Use Publish to set up SSH key
+        uses: smartlyio/setup-git-action@v1
+        env:
+          GIT_DEPLOY_KEY: ${{ secrets.GIT_DEPLOY_KEY }}
+      - name: Git Push
+        env:
+          ACTIVE_BRANCH: ${{ steps.get_active_branch.outputs.active_branch }}
+        run: |
+          GIT_CHANGES="$(git status --porcelain -- README.md || true)"
+          if [[ -n "$GIT_CHANGES" ]]; then
+              echo "Changes to README found!"
+
+              git diff -- README.md
+
+              git config --local user.email "bot@toc-generator"
+              git config --local user.name "GitHub Action"
+              git checkout "$ACTIVE_BRANCH"
+              git add README.md
+              git commit -m "Updating README ToC at $(date)"
+              git push
+          else
+              echo "No Changes Found."
+              exit 0
+          fi

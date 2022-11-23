@@ -1,0 +1,28 @@
+# IMPORTANT NOTE/WARNING!
+# Do not make changes to this file, your changes will be overwritten.
+#
+# This file is automagically generated from:
+# - .github/templates/label_close_stale_prs.yml.erb
+# - Templates contained in the smartlyio/github-actions-templates repository
+#
+# This file can be updated by editing the template file, and running `devbox render workflows`
+
+name: Mark stale issues and pull requests
+
+on:
+  schedule:
+  - cron: 0 2 * * 1-5
+
+jobs:
+  stale:
+    runs-on: ubuntu-20.04
+    steps:
+    - uses: actions/stale@v5
+      with:
+        repo-token: ${{ secrets.GITHUB_TOKEN }}
+        days-before-stale: 14
+        days-before-close: 14
+        stale-issue-message: 'There was no activity in this issue for 30 days and it will be closed in 14 days'
+        stale-pr-message: 'There was no activity in this PR for 30 days and it will be closed in 14 days'
+        stale-issue-label: 'no-issue-activity'
+        stale-pr-label: 'no-pr-activity'

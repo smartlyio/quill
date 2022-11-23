@@ -32,12 +32,12 @@
     }
   },
   "dependencies": {
-    "clone": "^2.1.1",
-    "deep-equal": "^1.0.1",
-    "eventemitter3": "^2.0.3",
-    "extend": "^3.0.2",
-    "parchment": "^1.1.4",
-    "quill-delta": "^3.6.2"
+    "clone": "2.1.1",
+    "deep-equal": "1.0.1",
+    "eventemitter3": "2.0.3",
+    "extend": "3.0.2",
+    "parchment": "1.1.4",
+    "quill-delta": "3.6.2"
   },
   "devDependencies": {
     "babel-core": "^6.26.0",
@@ -81,6 +81,8 @@
   "scripts": {
     "build": "webpack --config _develop/webpack.config.js; rm dist/quill.core dist/quill.bubble dist/quill.snow;",
     "build:release": "./_develop/scripts/release.sh",
+    "ci:install": "yarn",
+    "ci:publish": "yarn config set registry https://smartly.af/artifactory/api/npm/npm/ && yarn publish --new-version $VERSION",
     "start": "npm run build; bundle exec foreman start -f _develop/procfile",
     "test": "npm run test:unit",
     "test:all": "npm run test:unit; npm run test:functional",
@@ -95,5 +97,8 @@
     "editor",
     "rich text",
     "wysiwyg"
-  ]
+  ],
+  "publishConfig": {
+    "registry": "https://smartly.af/artifactory/api/npm/npm/"
+  }
 }

@@ -1,0 +1,10 @@
+- name: Set PR_VERSION
+  id: pr_version
+  run: |
+    <%- if release_type == "pr" -%>
+    pr_version="PR-${{ github.event.pull_request.number }}"
+    <%- elsif release_type == "dispatch" -%>
+    pr_version="${{ github.event.inputs.calling_repo }}-PR-${{ github.event.inputs.calling_pr }}"
+    <%- end -%>
+    echo PR_VERSION="$pr_version" >> "$GITHUB_ENV"
+    echo ::set-output name=PR_VERSION::"$pr_version"
